@@ -22,6 +22,7 @@ model = BailingMMNativeForConditionalGeneration.from_pretrained(
     low_cpu_mem_usage=True,
     load_image_gen=True
 ).to("cuda")
+model.talker.use_vllm = False
 
 # build processor
 processor = AutoProcessor.from_pretrained(".", trust_remote_code=True)
@@ -74,12 +75,12 @@ def process_inputs(model, processor, messages, has_audio=False):
             audios=audio_inputs,
             return_tensors="pt"
         )
-    
+
     inputs = inputs.to(model.device)
     for k in inputs.keys():
         if k == "pixel_values" or k == "pixel_values_videos" or k == "audio_feats":
             inputs[k] = inputs[k].to(dtype=torch.bfloat16)
-    
+
     return inputs
 
 
@@ -120,7 +121,7 @@ def generate_text(model, processor, messages, has_audio=False):
     output_text = processor.batch_decode(
         generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
     )[0]
-    
+
     return output_text
 
 
@@ -162,7 +163,7 @@ def text_to_speach(model, output_text, stream=False):
     #     spk_input = torch.load('data/spks/luna_eng.pt')
     is_chinese = contains_chinese(output_text)
     if not is_chinese:
-        output_text = output_text.split()   
+        output_text = output_text.split()
 
     speaker = 'luna' if is_chinese else 'eng'
     spk_input = spk_info.get(speaker, "luna")
@@ -214,6 +215,7 @@ def generate(model, processor, messages, state, use_audio_response=False):
 
     return text, audio_path, image_path
 
+
 ###########################################################################
 
 
@@ -230,7 +232,7 @@ def format_history(history: list):
                 messages[-1]["content"].append({"type": "text", "text": message})
             else:
                 messages.append({
-                    "role": role, 
+                    "role": role,
                     "content": [{"type": "text", "text": message}]
                 })
         elif role == "HUMAN" and (isinstance(message, list) or isinstance(message, tuple)):
@@ -303,10 +305,10 @@ def chat_predict(text, audio, image, video, history, use_audio_response, state):
         history.append((None, text))
 
     if audio_path:
-        history.append((None, (audio_path, )))
+        history.append((None, (audio_path,)))
 
     if image_path:
-        history.append((None, (image_path, )))
+        history.append((None, (image_path,)))
 
     yield gr.skip(), gr.skip(), gr.skip(), gr.skip(), history, gr.update(visible=True), gr.update(visible=False)
 
@@ -335,11 +337,11 @@ with gr.Blocks() as demo:
     gr.Markdown(
         """
         # Ming-Lite-Omni Demo
-        
+
         ## Instructions for use
-        
-        1. Upload an image, video or audio clip. 
-        
+
+        1. Upload an image, video or audio clip.
+
         2. The instruction is input via the text or audio clip.
 
         3. Click on the Submit button and wait for the model's response.
@@ -353,19 +355,19 @@ with gr.Blocks() as demo:
     # Media upload section in one row
     with gr.Row(equal_height=True):
         audio_input = gr.Audio(sources=["upload"],
-                                type="filepath",
-                                label="Upload Audio",
-                                elem_classes="media-upload",
-                                scale=1)
+                               type="filepath",
+                               label="Upload Audio",
+                               elem_classes="media-upload",
+                               scale=1)
         image_input = gr.Image(sources=["upload"],
-                                type="filepath",
-                                label="Upload Image",
-                                elem_classes="media-upload",
-                                scale=1)
+                               type="filepath",
+                               label="Upload Image",
+                               elem_classes="media-upload",
+                               scale=1)
         video_input = gr.Video(sources=["upload"],
-                                label="Upload Video",
-                                elem_classes="media-upload",
-                                scale=1)
+                               label="Upload Video",
+                               elem_classes="media-upload",
+                               scale=1)
 
     # Text input section
     text_input = gr.Textbox(show_label=False,
@@ -471,7 +473,7 @@ with gr.Blocks() as demo:
         examples=[
             [
                 "请详细介绍鹦鹉的生活习性"
-            ],           
+            ],
         ],
         label="Text QA",
         inputs=[text_input],
@@ -485,7 +487,7 @@ with gr.Blocks() as demo:
             [
                 "figures/cases/flower.jpg",
                 "What kind of flower is this?"
-            ],           
+            ],
         ],
         label="Image QA",
         inputs=[image_input, text_input],
@@ -499,8 +501,8 @@ with gr.Blocks() as demo:
             [
                 "figures/cases/yoga.mp4",
                 "What is the woman doing?"
-                
-            ],           
+
+            ],
         ],
         label="Video QA",
         inputs=[video_input, text_input],
@@ -511,7 +513,7 @@ with gr.Blocks() as demo:
         fn=fill_in_image_qa_example,
         run_on_click=True,
         examples=[
-            [    
+            [
                 "figures/cases/reasoning.png",
                 "SYSTEM: You are a helpful assistant. When the user asks a question, your response must include two parts: first, the reasoning process enclosed in <thinking>...</thinking> tags, then the final answer enclosed in <answer>...</answer> tags. The critical answer or key result should be placed within \\boxed{}.\nPlease answer the question and provide the correct option letter, e.g., A, B, C, D, at the end.\nQuestion: Find $m\\angle H$\nChoices:\n(A) 97\n(B) 102\n(C) 107\n(D) 122.\n"
             ],
@@ -528,8 +530,8 @@ with gr.Blocks() as demo:
             [
                 "data/wavs/BAC009S0915W0283.wav",
                 "Please recognize the language of this speech and transcribe it. Format: oral."
-                
-            ],           
+
+            ],
         ],
         label="Automatic speech recognition (ASR)",
         inputs=[audio_input, text_input],
@@ -542,7 +544,7 @@ with gr.Blocks() as demo:
         examples=[
             [
                 "data/wavs/speechQA_sample.wav"
-            ]          
+            ]
         ],
         label="Speech to speech",
         inputs=[audio_input],
@@ -555,8 +557,8 @@ with gr.Blocks() as demo:
         examples=[
             [
                 "Draw a girl with short hair"
-            ]          
-        ],  
+            ]
+        ],
         label="Image generation",
         inputs=[text_input],
         outputs=[text_input, audio_input, image_input, video_input, chatbot]
@@ -569,7 +571,7 @@ with gr.Blocks() as demo:
             [
                 "figures/cases/cake.jpg",
                 "Add candles on top of the cake"
-            ]          
+            ]
         ],
         label="Image editing",
         inputs=[image_input, text_input],

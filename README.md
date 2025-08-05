@@ -168,9 +168,10 @@ You can download our latest model from both Huggingface and ModelScope. For prev
 
 <div align="center">
 
-| **Model**          |   **Input modality**   | **Oput modality** |                                                                         **Download**                                                                         |
-|:-------------------|:----------------------:| :---------------: |:------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-| Ming-Lite-Omni-1.5 | Image,text,video,audio | Image,text,audio  | [🤗 HuggingFace](https://huggingface.co/inclusionAI/Ming-Lite-Omni-1.5) <br>[🤖 ModelScope](https://www.modelscope.cn/models/inclusionAI/Ming-Lite-Omni-1.5) |
+| **Model**              |   **Input modality**   | **Oput modality** |                                                                         **Download**                                                                         |
+|:-----------------------|:----------------------:| :---------------: |:------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+| Ming-Lite-Omni-1.5-FP8 | Image,text,video,audio | Image,text,audio  | [🤗 HuggingFace](https://huggingface.co/inclusionAI/Ming-lite-omni-1.5-FP8/tree/main) <br>[🤖 ModelScope](https://www.modelscope.cn/models/inclusionAI/Ming-lite-omni-1.5-FP8/files) |
+| Ming-Lite-Omni-1.5     | Image,text,video,audio | Image,text,audio  | [🤗 HuggingFace](https://huggingface.co/inclusionAI/Ming-Lite-Omni-1.5) <br>[🤖 ModelScope](https://www.modelscope.cn/models/inclusionAI/Ming-Lite-Omni-1.5) |
 </div>
 If you're in mainland China, we strongly recommend you to download our model from 🤖 <a href="https://www.modelscope.cn/models/inclusionAI/Ming-Lite-Omni-1.5">ModelScope</a>.
 
@@ -238,6 +239,7 @@ Download our model following [Model Downloads](#model-downloads)
 ```shell
 mkdir inclusionAI 
 ln -s /path/to/inclusionAI/Ming-Lite-Omni-1.5 inclusionAI/Ming-Lite-Omni
+ln -s /path/to/inclusionAI/Ming-Lite-Omni-1.5-FP8 inclusionAI/Ming-Lite-Omni-FP8
 ```
 
 Step 3 - Enter the code directory, you can refer to the following codes to run the Ming-Lite-Omni model.
@@ -342,6 +344,90 @@ python gradio_demo.py
 ```
 
 
+## Deployment
+
+### download model checkpoint
+download model ckeckpoint from huggingface or modelscope to local **inclusionAI/Ming-Lite-Omni-FP8**, and install vllm library
+
+### install python dependencies
+
+```
+cd Ming
+pip install -r requirements.txt
+pip install data/matcha_tts-0.0.5.1-cp310-cp310-linux_x86_64.whl
+pip install diffusers==0.33.0
+```
+
+### install vLLM
+vLLM supports offline batched inference or launching an OpenAI-Compatible API Service for online inference.
+
+### Environment Preparation
+Since the Pull Request (PR) has not been submitted to the vLLM community at this stage, please prepare the environment by following the steps below:
+
+#### Installation with pip
+```
+pip install inclusionAI/Ming-Lite-Omni-FP8/flash_attn-2.7.0.post1%2Bcu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+pip install inclusionAI/Ming-Lite-Omni-FP8/vllm-0.8.6.dev1+ga37daf9e9.d20250730-cp310-cp310-linux_x86_64.whl
+```
+
+#### build from source
+```
+git clone https://github.com/vllm-project/ming.git
+git clone -b  v0.8.5 https://github.com/vllm-project/vllm.git
+cd vllm
+git apply ../Ming/vllm/ming_lite.patch
+pip install -e .
+```
+
+
+vLLM supports Ming-Lite-1.5 model single-GPU and multi-GPU modes. It is worth noting that if running in single-GPU mode, in image_generation accelerating, taking L20 as an example, you need to manually set the vLLM parameter gpu_memory_utilization=0.6 to ensure that vLLM memory usage is not out of memory. Here is a example:
+
+
+#### start talker(vllm)
+Before starting the vLLM inference, first launch the talker service. Note that different memory allocation percentages need to be set for GPUs with varying VRAM capacities. For specific details, refer to the table below.
+
+|gpu|memory|gpu-memory-utilization|
+|--|--|--|
+|L20|48GB|0.1|
+|H20|80GB|0.06|
+
+
+```
+MODEL_PATH=inclusionAI/Ming-Lite-Omni-FP8
+python talker/talker_vllm_server.py --model ${MODEL_PATH}/talker --gpu-memory-utilization 0.1 --port 8816
+```
+
+
+
+### Offline Inference
+
+Single-task example:
+```
+python examples/vllm_demo.py
+```
+
+Multimodal multi-turn conversation example:
+```
+python examples/mutidal_multiturn_vllm_demo.py
+```
+
+
+In order to use vLLM with rope, we need to change:
+
+Replace the rope_scaling in HuggingFace version with this config.json file:
+```
+ "rope_scaling": {
+   "type": "3D",
+   "rope_type": "default",
+   "mrope_section": [
+       16,
+       24,
+       24
+  ],
+  "use_3d_rope": true
+ },
+     
+```
 
 ## License and Legal Disclaimer
 
