@@ -425,7 +425,6 @@ For more examples, please refer to the official the examples `ming_sdk/ming_test
 import torch
 import torchaudio
 import numpy as np
-from pydub import AudioSegment
 from ming_sdk.ming import Ming
 
 ming = Ming(
